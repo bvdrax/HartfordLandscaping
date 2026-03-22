@@ -11,7 +11,7 @@ interface Props {
 export default function AccountClient({ name, email, hasPassword: initialHasPassword }: Props) {
   const [hasPassword, setHasPassword] = useState(initialHasPassword)
   const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 

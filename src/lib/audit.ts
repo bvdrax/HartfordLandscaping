@@ -1,4 +1,5 @@
-import prisma from './prisma'
+import { prisma } from './prisma'
+import { Prisma } from '@prisma/client'
 
 interface AuditParams {
   entityType: string
@@ -21,8 +22,8 @@ export async function writeAudit(params: AuditParams): Promise<void> {
         entityId: params.entityId,
         action: params.action,
         changedByUserId: params.changedByUserId ?? null,
-        before: params.before ?? undefined,
-        after: params.after ?? undefined,
+        before: params.before as Prisma.InputJsonValue ?? undefined,
+        after: params.after as Prisma.InputJsonValue ?? undefined,
       },
     })
   } catch {
