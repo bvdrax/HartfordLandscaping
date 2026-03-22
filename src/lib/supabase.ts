@@ -1,0 +1,16 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+export const PHOTOS_BUCKET = 'project-photos'
+
+let _client: SupabaseClient | null = null
+
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_client) {
+    _client = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } },
+    )
+  }
+  return _client
+}

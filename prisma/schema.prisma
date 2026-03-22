@@ -1,0 +1,582 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  PLATFORM_ADMIN
+  OWNER
+  ACCOUNTANT
+  PROJECT_MANAGER
+  FIELD_WORKER
+  SUBCONTRACTOR
+}
+
+enum PayType {
+  HOURLY
+  SALARY
+  SUBCONTRACT
+}
+
+enum CustomerPersona {
+  HOMEOWNER
+  SPOUSE
+  PROPERTY_MANAGER
+  BUILDER
+  HOA_REP
+  CONTRACTOR
+  OTHER
+}
+
+enum ProjectStatus {
+  LEAD
+  QUOTED
+  APPROVED
+  SCHEDULED
+  IN_PROGRESS
+  PUNCH_LIST
+  COMPLETE
+  INVOICED
+  PAID
+  ARCHIVED
+}
+
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  HOA
+  BUILDER
+}
+
+enum PhotoCategory {
+  BEFORE
+  PROPOSED_MOCKUP
+  IN_PROGRESS
+  AFTER
+  RECEIPT
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+}
+
+enum ChangeOrderStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum InvoiceType {
+  DEPOSIT
+  MILESTONE
+  FINAL
+  RECURRING
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  CARD_STRIPE
+  ACH
+  ZELLE
+  VENMO
+  OTHER
+}
+
+enum ReceiptStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationType {
+  QUOTE_SENT
+  QUOTE_APPROVED
+  INVOICE_SENT
+  INVOICE_PAID
+  SCHEDULE_ASSIGNED
+  WORK_STARTING
+  WORK_COMPLETE
+  GENERAL
+}
+
+// ─── Users & Roles ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?
+  firstName    String
+  lastName     String
+  role         Role     @default(FIELD_WORKER)
+  isActive     Boolean  @default(true)
+  passwordHash String?  // nullable; dev/test only — null in production
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  workerProfile       WorkerProfile?
+  timeLogs            TimeLog[]
+  receipts            Receipt[]         @relation("UploadedByUser")
+  reviewedReceipts    Receipt[]         @relation("ReviewedByUser")
+  uploadedPhotos      ProjectPhoto[]
+  approvedTimeLogs    TimeLog[]         @relation("ApprovedByUser")
+  uploadedPriceLists  PriceList[]
+  managedProjects     Project[]         @relation("ProjectManager")
+  crewLead            Crew[]
+  notifications       Notification[]
+  assignedTasks       Task[]
+}
+
+model WorkerProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hourlyRate       Decimal? @db.Decimal(10, 2)
+  payType          PayType  @default(HOURLY)
+  crewId           String?
+  crew             Crew?    @relation(fields: [crewId], references: [id])
+  isActive         Boolean  @default(true)
+  emergencyContact String?
+  notes            String?
+}
+
+model Crew {
+  id           String   @id @default(cuid())
+  name         String
+  leadWorkerId String?
+  lead         User?    @relation(fields: [leadWorkerId], references: [id])
+  isActive     Boolean  @default(true)
+
+  // Relations
+  members            WorkerProfile[]
+  projectAssignments CrewProjectAssignment[]
+  projects           Project[]
+  timeLogs           TimeLog[]
+}
+
+model CrewProjectAssignment {
+  id        String   @id @default(cuid())
+  crewId    String
+  crew      Crew     @relation(fields: [crewId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  startDate DateTime
+  endDate   DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@unique([crewId, projectId])
+}
+
+// ─── Customers & Projects ──────────────────────────────────────────────────────
+
+model Customer {
+  id               String          @id @default(cuid())
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  persona          CustomerPersona @default(HOMEOWNER)
+  isPrimary        Boolean         @default(false)
+  notes            String?
+  projectId        String
+  project          Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  magicLinkToken   String?         @unique
+  magicLinkExpiry  DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  // Relations
+  approvedQuotes       Quote[]       @relation("ApprovedByCustomer")
+  approvedChangeOrders ChangeOrder[] @relation("ChangeOrderApprovedBy")
+}
+
+model Project {
+  id                   String        @id @default(cuid())
+  name                 String
+  status               ProjectStatus @default(LEAD)
+  projectType          ProjectType   @default(RESIDENTIAL)
+  siteAddress          Json          // { street, city, state, zip, lat, lng }
+  startDate            DateTime?
+  estimatedEndDate     DateTime?
+  actualEndDate        DateTime?
+  estimatedHours       Decimal?      @db.Decimal(8, 2)
+  crewId               String?
+  crew                 Crew?         @relation(fields: [crewId], references: [id])
+  projectManagerId     String?
+  projectManager       User?         @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  globalMarginOverride Decimal?      @db.Decimal(5, 2) // overrides global margin for this project
+  notes                String?
+  internalNotes        String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  customers          Customer[]
+  photos             ProjectPhoto[]
+  quotes             Quote[]
+  invoices           Invoice[]
+  timeLogs           TimeLog[]
+  tasks              Task[]
+  receipts           Receipt[]
+  changeOrders       ChangeOrder[]
+  crewAssignments    CrewProjectAssignment[]
+}
+
+model ProjectPhoto {
+  id               String        @id @default(cuid())
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedByUserId String
+  uploadedBy       User          @relation(fields: [uploadedByUserId], references: [id])
+  storageUrl       String
+  thumbnailUrl     String?
+  category         PhotoCategory
+  caption          String?
+  areaTag          String?       // e.g. 'Front bed', 'Side fence'
+  takenAt          DateTime?
+  uploadedAt       DateTime      @default(now())
+}
+
+model Task {
+  id               String     @id @default(cuid())
+  projectId        String
+  project          Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedToUserId String?
+  assignedTo       User?      @relation(fields: [assignedToUserId], references: [id])
+  title            String
+  description      String?
+  status           TaskStatus @default(OPEN)
+  dueDate          DateTime?
+  completedAt      DateTime?
+  isPunchListItem  Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+// ─── Quotes & Line Items ───────────────────────────────────────────────────────
+
+model Quote {
+  id                   String      @id @default(cuid())
+  projectId            String
+  project              Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versionNumber        Int         @default(1)
+  status               QuoteStatus @default(DRAFT)
+  sentAt               DateTime?
+  approvedAt           DateTime?
+  expiresAt            DateTime?
+  approvedByCustomerId String?
+  approvedBy           Customer?   @relation("ApprovedByCustomer", fields: [approvedByCustomerId], references: [id])
+  laborTotal           Decimal     @default(0) @db.Decimal(12, 2)
+  materialsTotal       Decimal     @default(0) @db.Decimal(12, 2)
+  taxTotal             Decimal     @default(0) @db.Decimal(12, 2)
+  total                Decimal     @default(0) @db.Decimal(12, 2)
+  globalMarginPct      Decimal     @default(0) @db.Decimal(5, 2) // snapshot at creation time
+  notes                String?
+  termsAndConditions   String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  // Relations
+  lineItems    QuoteLineItem[]
+  changeOrders ChangeOrder[]
+  invoices     Invoice[]
+}
+
+model QuoteLineItem {
+  id                 String   @id @default(cuid())
+  quoteId            String?
+  quote              Quote?   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  changeOrderId      String?
+  changeOrder        ChangeOrder? @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  skuId              String?  // nullable for free-form labor lines
+  sku                Sku?     @relation(fields: [skuId], references: [id])
+  description        String
+  quantity           Decimal  @db.Decimal(10, 3)
+  unitPrice          Decimal  @db.Decimal(10, 2) // LOCKED at quote creation time
+  laborPricePerUnit  Decimal  @default(0) @db.Decimal(10, 2)
+  laborHoursPerUnit  Decimal  @default(0) @db.Decimal(8, 3)
+  marginPctOverride  Decimal? @db.Decimal(5, 2) // per-line override
+  lineTotal          Decimal  @db.Decimal(12, 2) // computed server-side
+  sortOrder          Int      @default(0)
+}
+
+model ChangeOrder {
+  id                   String            @id @default(cuid())
+  projectId            String
+  project              Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  quoteId              String?
+  quote                Quote?            @relation(fields: [quoteId], references: [id])
+  versionNumber        Int               @default(1)
+  status               ChangeOrderStatus @default(DRAFT)
+  description          String?
+  total                Decimal           @default(0) @db.Decimal(12, 2)
+  approvedAt           DateTime?
+  approvedByCustomerId String?
+  approvedBy           Customer?         @relation("ChangeOrderApprovedBy", fields: [approvedByCustomerId], references: [id])
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relations
+  lineItems QuoteLineItem[]
+}
+
+// ─── Suppliers & SKUs ──────────────────────────────────────────────────────────
+
+model Supplier {
+  id            String      @id @default(cuid())
+  name          String
+  accountNumber String?
+  repName       String?
+  repPhone      String?
+  repEmail      String?
+  notes         String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  priceLists PriceList[]
+  skus       Sku[]
+}
+
+model PriceList {
+  id              String   @id @default(cuid())
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  name            String
+  effectiveDate   DateTime
+  isActive        Boolean  @default(true)
+  uploadedByUserId String
+  uploadedBy      User     @relation(fields: [uploadedByUserId], references: [id])
+  sourceImageUrl  String?  // original photo if OCR was used
+  createdAt       DateTime @default(now())
+
+  // Relations
+  skus Sku[]
+}
+
+model Sku {
+  id                 String   @id @default(cuid())
+  priceListId        String
+  priceList          PriceList @relation(fields: [priceListId], references: [id])
+  supplierId         String
+  supplier           Supplier  @relation(fields: [supplierId], references: [id])
+  supplierItemNumber String?
+  name               String
+  description        String?
+  unitOfMeasure      String    // e.g. 'each', 'sq ft', 'lb', 'bag', 'pallet'
+  basePrice          Decimal   @db.Decimal(10, 2)
+  globalMarginPct    Decimal?  @db.Decimal(5, 2) // overrides global if set
+  isActive           Boolean   @default(true)
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  bulkPricingTiers  SkuBulkPricingTier[]
+  quoteLineItems    QuoteLineItem[]
+  receiptLineItems  ReceiptLineItem[]
+}
+
+model SkuBulkPricingTier {
+  id           String  @id @default(cuid())
+  skuId        String
+  sku          Sku     @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  minQuantity  Decimal @db.Decimal(10, 3)
+  pricePerUnit Decimal @db.Decimal(10, 2)
+
+  @@index([skuId, minQuantity])
+}
+
+// ─── Invoicing & Payments ──────────────────────────────────────────────────────
+
+model Invoice {
+  id                    String        @id @default(cuid())
+  projectId             String
+  project               Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  quoteId               String?
+  quote                 Quote?        @relation(fields: [quoteId], references: [id])
+  invoiceNumber         String        @unique
+  status                InvoiceStatus @default(DRAFT)
+  type                  InvoiceType   @default(FINAL)
+  amountDue             Decimal       @db.Decimal(12, 2)
+  amountPaid            Decimal       @default(0) @db.Decimal(12, 2)
+  taxRate               Decimal       @default(0) @db.Decimal(5, 4) // e.g. 0.0875 for 8.75%
+  taxAmount             Decimal       @default(0) @db.Decimal(12, 2)
+  total                 Decimal       @db.Decimal(12, 2)
+  dueDate               DateTime?
+  sentAt                DateTime?
+  paidAt                DateTime?
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Relations
+  payments Payment[]
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+  amount          Decimal       @db.Decimal(12, 2)
+  paymentMethod   PaymentMethod
+  paidAt          DateTime
+  referenceNumber String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+}
+
+// ─── Time & Labor ──────────────────────────────────────────────────────────────
+
+model TimeLog {
+  id                String    @id @default(cuid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  crewId            String?
+  crew              Crew?     @relation(fields: [crewId], references: [id])
+  clockInAt         DateTime
+  clockOutAt        DateTime?
+  breakMinutes      Int       @default(0)
+  totalMinutes      Int?      // computed: (clockOut - clockIn) - breakMinutes
+  clockInLocation   Json?     // { lat, lng }
+  clockOutLocation  Json?     // { lat, lng }
+  notes             String?
+  approvedByUserId  String?
+  approvedBy        User?     @relation("ApprovedByUser", fields: [approvedByUserId], references: [id])
+  approvedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ─── Receipts & Costs ──────────────────────────────────────────────────────────
+
+model Receipt {
+  id               String        @id @default(cuid())
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedByUserId String
+  uploadedBy       User          @relation("UploadedByUser", fields: [uploadedByUserId], references: [id])
+  vendor           String?
+  receiptDate      DateTime?
+  totalAmount      Decimal?      @db.Decimal(12, 2)
+  taxAmount        Decimal?      @db.Decimal(12, 2)
+  deliveryFee      Decimal?      @db.Decimal(12, 2)
+  storageUrl       String?       // uploaded image
+  status           ReceiptStatus @default(PENDING)
+  notes            String?
+  reviewedByUserId String?
+  reviewedBy       User?         @relation("ReviewedByUser", fields: [reviewedByUserId], references: [id])
+  reviewedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  lineItems ReceiptLineItem[]
+}
+
+model ReceiptLineItem {
+  id                 String   @id @default(cuid())
+  receiptId          String
+  receipt            Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  skuId              String?  // optional link to SKU for cost analysis
+  sku                Sku?     @relation(fields: [skuId], references: [id])
+  description        String
+  quantity           Decimal  @default(1) @db.Decimal(10, 3)
+  unitCost           Decimal  @db.Decimal(10, 2)
+  extendedCost       Decimal  @db.Decimal(12, 2)
+  amortizedTax       Decimal  @default(0) @db.Decimal(10, 2)
+  amortizedDelivery  Decimal  @default(0) @db.Decimal(10, 2)
+  totalCost          Decimal  @db.Decimal(12, 2)
+}
+
+// ─── Notifications & Audit ─────────────────────────────────────────────────────
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String?
+  user      User?               @relation(fields: [userId], references: [id])
+  projectId String?
+  type      NotificationType
+  channel   NotificationChannel
+  message   String
+  sentAt    DateTime?
+  status    NotificationStatus  @default(PENDING)
+  metadata  Json?
+  createdAt DateTime            @default(now())
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  entityType      String   // e.g. 'Project', 'Quote', 'Invoice'
+  entityId        String
+  action          String   // e.g. 'STATUS_CHANGED', 'PRICE_EDITED', 'APPROVED'
+  changedByUserId String?
+  changedAt       DateTime @default(now())
+  before          Json?
+  after           Json?
+
+  @@index([entityType, entityId])
+  @@index([changedByUserId])
+}
+
+// ─── Global Settings ───────────────────────────────────────────────────────────
+
+model GlobalSettings {
+  id                String   @id @default("singleton")
+  defaultMarginPct  Decimal  @default(30) @db.Decimal(5, 2) // 30% default margin
+  defaultTaxRate    Decimal  @default(0) @db.Decimal(5, 4)  // e.g. 0.0875
+  companyName       String   @default("Hartford Landscaping")
+  companyPhone      String?
+  companyEmail      String?
+  companyAddress    String?
+  companyLogoUrl    String?
+  updatedAt         DateTime @updatedAt
+}
