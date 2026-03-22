@@ -1,6 +1,9 @@
 import { getNavItems, getMobileNavItems } from '@/lib/nav'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
+import ActiveClockInBanner from './time/ActiveClockInBanner'
+import OfflineBanner from './OfflineBanner'
+import InstallPrompt from './InstallPrompt'
 import type { SessionPayload } from '@/lib/auth'
 
 interface Props {
@@ -25,10 +28,13 @@ export default function AppLayout({ session, children }: Props) {
 
       {/* Main content — offset by sidebar on desktop, padded for bottom nav on mobile */}
       <main className="lg:pl-60 pb-16 lg:pb-0 min-h-screen">
+        <OfflineBanner />
+        <ActiveClockInBanner />
         {children}
       </main>
 
       <BottomNav navItems={mobileNavItems} />
+      <InstallPrompt />
     </div>
   )
 }

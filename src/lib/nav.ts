@@ -57,6 +57,18 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['PLATFORM_ADMIN', 'OWNER', 'ACCOUNTANT', 'PROJECT_MANAGER'],
   },
   {
+    label: 'Reports',
+    href: '/reports',
+    icon: 'BarChart2',
+    roles: ['PLATFORM_ADMIN', 'OWNER', 'ACCOUNTANT'],
+  },
+  {
+    label: 'Users',
+    href: '/users',
+    icon: 'UserCog',
+    roles: ['PLATFORM_ADMIN', 'OWNER'],
+  },
+  {
     label: 'Settings',
     href: '/settings',
     icon: 'Settings',

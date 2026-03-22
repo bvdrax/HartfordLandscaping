@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderOpen, FileText, Receipt, Clock,
-  Camera, Users, Package, Settings, type LucideIcon,
+  Camera, Users, UserCog, Package, BarChart2, Settings, type LucideIcon,
 } from 'lucide-react'
 import type { NavItem } from '@/lib/nav'
 
@@ -16,7 +16,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Clock,
   Camera,
   Users,
+  UserCog,
   Package,
+  BarChart2,
   Settings,
 }
 

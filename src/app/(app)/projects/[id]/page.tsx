@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { MapPin, Calendar, Clock, Users, Pencil, ChevronLeft, FileText, Receipt } from 'lucide-react'
+import { MapPin, Calendar, Clock, Users, Pencil, ChevronLeft, FileText, Receipt, Camera } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/invoices/InvoiceStatusBadge'
 import StatusBadge from '@/components/projects/StatusBadge'
 import PhotoGallery from '@/components/projects/PhotoGallery'
@@ -10,6 +10,7 @@ import QuoteStatusBadge from '@/components/quotes/QuoteStatusBadge'
 import CreateQuoteButton from '@/components/quotes/CreateQuoteButton'
 import SendPortalButton from '@/components/projects/SendPortalButton'
 import SmsButtons from '@/components/projects/SmsButtons'
+import AssignCrewForm from '@/components/workers/AssignCrewForm'
 
 interface SiteAddress { street?: string; city?: string; state?: string; zip?: string }
 
@@ -32,11 +33,21 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
         include: { uploadedBy: { select: { firstName: true, lastName: true } } },
         orderBy: { uploadedAt: 'desc' },
       },
-      quotes: { orderBy: { versionNumber: 'desc' } },
+      quotes: {
+        orderBy: { versionNumber: 'desc' },
+        include: { lineItems: { select: { quantity: true, laborHoursPerUnit: true } } },
+      },
       invoices: { orderBy: { createdAt: 'desc' } },
+      timeLogs: { select: { totalMinutes: true, clockOutAt: true } },
       _count: { select: { photos: true, quotes: true, invoices: true } },
     },
   })
+
+  const activeCrews = project ? await prisma.crew.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, members: { select: { user: { select: { firstName: true, phone: true } } } } },
+    orderBy: { name: 'asc' },
+  }) : []
 
   if (!project) notFound()
 
@@ -50,6 +61,21 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
   const canEdit = ['OWNER', 'PROJECT_MANAGER', 'PLATFORM_ADMIN'].includes(roleStr)
   const canSeeInternal = ['OWNER', 'PLATFORM_ADMIN'].includes(roleStr)
   const canDelete = ['OWNER', 'PLATFORM_ADMIN'].includes(roleStr)
+
+  // Estimated hours from approved quote line items
+  const approvedQuote = project.quotes.find((q) => q.status === 'APPROVED')
+  const estimatedHoursFromQuote = approvedQuote
+    ? approvedQuote.lineItems.reduce(
+        (sum, li) => sum + Number(li.quantity) * Number(li.laborHoursPerUnit),
+        0
+      )
+    : null
+
+  // Actual hours from completed time logs
+  const actualMinutes = project.timeLogs
+    .filter((tl) => tl.clockOutAt)
+    .reduce((sum, tl) => sum + (tl.totalMinutes ?? 0), 0)
+  const actualHours = actualMinutes / 60
 
   // Serialize photos for client component
   const photos = project.photos.map((p) => ({
@@ -110,10 +136,22 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
             <p>Start: {project.startDate ? new Date(project.startDate).toLocaleDateString() : 'TBD'}</p>
             <p>End: {project.estimatedEndDate ? new Date(project.estimatedEndDate).toLocaleDateString() : 'TBD'}</p>
           </div>
-          {project.estimatedHours && (
-            <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
-              <Clock size={12} />
-              {Number(project.estimatedHours)}h estimated
+          {(estimatedHoursFromQuote !== null || project.estimatedHours || actualHours > 0) && (
+            <div className="mt-2 space-y-0.5">
+              {(estimatedHoursFromQuote !== null || project.estimatedHours) && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock size={12} />
+                  {estimatedHoursFromQuote !== null
+                    ? `${estimatedHoursFromQuote.toFixed(1)}h est. (quote)`
+                    : `${Number(project.estimatedHours)}h estimated`}
+                </div>
+              )}
+              {actualHours > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock size={12} />
+                  {actualHours.toFixed(1)}h actual
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -129,6 +167,17 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           </div>
         </div>
       </div>
+
+      {canEdit && activeCrews.length > 0 && (
+        <section className="bg-card border border-border rounded-lg p-4">
+          <h2 className="text-sm font-semibold text-foreground mb-3">Assign Crew</h2>
+          <AssignCrewForm
+            projectId={project.id}
+            crews={activeCrews}
+            currentCrewId={project.crewId ?? null}
+          />
+        </section>
+      )}
 
       {project.customers.length > 0 && (
         <section>
@@ -223,6 +272,17 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
           </div>
         )}
       </section>
+
+      {canEdit && (
+        <div className="flex items-center justify-between">
+          <Link href={'/receipts/new?projectId=' + project.id} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+            <Camera size={13} />Add Receipt
+          </Link>
+          <Link href={'/receipts?projectId=' + project.id} className="text-xs text-muted-foreground hover:text-foreground">
+            View receipts
+          </Link>
+        </div>
+      )}
 
       <section>
         <h2 className="text-base font-semibold text-foreground mb-3">Photos</h2>

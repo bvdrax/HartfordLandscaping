@@ -16,7 +16,6 @@ export default async function LoginPage({ searchParams }: Props) {
   const session = await getSession()
   if (session) redirect('/dashboard')
 
-  const devMode = process.env.DEV_PASSWORD_AUTH === 'true'
   const error = searchParams.error ? (errorMessages[searchParams.error] ?? 'Something went wrong.') : null
 
   return (
@@ -32,11 +31,8 @@ export default async function LoginPage({ searchParams }: Props) {
               {error}
             </div>
           )}
-          <LoginForm devMode={devMode} />
+          <LoginForm />
         </div>
-        {devMode && (
-          <p className="text-center text-xs text-amber-600 mt-4">Dev mode active</p>
-        )}
       </div>
     </div>
   )

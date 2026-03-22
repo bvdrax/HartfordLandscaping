@@ -12,7 +12,7 @@ const withPWA = withPWAInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'prisma', '@supabase/supabase-js', 'resend', 'jsonwebtoken', 'stripe'],
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma', '@supabase/supabase-js', 'resend', 'jsonwebtoken', 'stripe', '@anthropic-ai/sdk', 'twilio'],
   },
   images: {
     remotePatterns: [

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireSession } from '@/lib/middleware'
 import { ok, err, notFound, serverError } from '@/lib/api'
+import { writeAudit } from '@/lib/audit'
 
 function getId(req: NextRequest) {
   const parts = req.nextUrl.pathname.split('/')
@@ -89,6 +90,13 @@ export async function PATCH(req: NextRequest) {
       },
     })
 
+    await writeAudit({
+      entityType: 'Invoice', entityId: id, action: 'PRICE_EDITED',
+      changedByUserId: session.userId,
+      before: { amountDue: Number(invoice.amountDue), total: Number(invoice.total) },
+      after: { amountDue: amountDueNum, total: Number(updated.total) },
+    })
+
     return ok({ id: updated.id, total: Number(updated.total) })
   } catch (e) {
     return serverError(e)
@@ -108,6 +116,11 @@ export async function DELETE(req: NextRequest) {
     // Void rather than delete if already sent
     if (invoice.status === 'SENT' || invoice.status === 'PARTIAL' || invoice.status === 'PAID') {
       await prisma.invoice.update({ where: { id }, data: { status: 'VOID' } })
+      await writeAudit({
+        entityType: 'Invoice', entityId: id, action: 'STATUS_CHANGED',
+        changedByUserId: session.userId,
+        before: { status: invoice.status }, after: { status: 'VOID' },
+      })
       return ok({ voided: true })
     }
 

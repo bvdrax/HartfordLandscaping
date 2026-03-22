@@ -4,13 +4,25 @@ import { prisma } from '@/lib/prisma'
 import { signMagicLinkToken, signSessionToken, buildSessionCookieHeader } from '@/lib/auth'
 import { ok, err, serverError } from '@/lib/api'
 import { Resend } from 'resend'
+import { MagicLinkSchema, parseBody } from '@/lib/validation'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, password } = body as { email: string; password?: string }
+    // Rate limit: 5 attempts per IP per 15 minutes
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const rl = checkRateLimit(`magic-link:${ip}`, { windowMs: 15 * 60 * 1000, max: 5 })
+    if (!rl.allowed) {
+      return new NextResponse(JSON.stringify({ data: null, error: 'Too many requests. Please try again later.', meta: null }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      })
+    }
 
-    if (!email) return err('Email is required')
+    const body = await request.json()
+    const parsed = parseBody(MagicLinkSchema, body)
+    if (!parsed.success) return err(parsed.error)
+    const { email, password } = parsed.data
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
 

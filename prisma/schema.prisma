@@ -151,7 +151,7 @@ model User {
   lastName     String
   role         Role     @default(FIELD_WORKER)
   isActive     Boolean  @default(true)
-  passwordHash String?  // nullable; dev/test only — null in production
+  passwordHash String?  // nullable; null means magic-link-only login
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

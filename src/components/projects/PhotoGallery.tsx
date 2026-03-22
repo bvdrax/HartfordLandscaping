@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Trash2, ZoomIn, Upload, X } from 'lucide-react'
+import { Trash2, ZoomIn, Upload, X, WifiOff } from 'lucide-react'
+import { enqueue } from '@/lib/offline-db'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 
 const CATEGORY_LABELS: Record<string, string> = {
   ALL: 'All', BEFORE: 'Before', PROPOSED_MOCKUP: 'Proposed',
@@ -36,6 +38,7 @@ interface PhotoGalleryProps {
 }
 
 export default function PhotoGallery({ projectId, initialPhotos, canDelete }: PhotoGalleryProps) {
+  const online = useOnlineStatus()
   const [photos, setPhotos] = useState<Photo[]>(initialPhotos)
   const [activeTab, setActiveTab] = useState('ALL')
   const [lightbox, setLightbox] = useState<Photo | null>(null)
@@ -46,6 +49,7 @@ export default function PhotoGallery({ projectId, initialPhotos, canDelete }: Ph
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const fetchPhotos = useCallback(async () => {
@@ -82,6 +86,21 @@ export default function PhotoGallery({ projectId, initialPhotos, canDelete }: Ph
     if (!file) { setUploadError('Please select a file'); return }
     setUploading(true)
     setUploadError(null)
+
+    if (!online) {
+      const blob = new Blob([await file.arrayBuffer()], { type: file.type })
+      await enqueue({
+        type: 'photo-upload',
+        payload: { projectId, category, caption: caption.trim() || '', blob, fileName: file.name, mimeType: file.type },
+      })
+      setUploading(false)
+      resetUpload()
+      setUploadOpen(false)
+      setQueuedMessage('Photo queued — will upload when back online')
+      setTimeout(() => setQueuedMessage(null), 5000)
+      return
+    }
+
     const fd = new FormData()
     fd.append('file', file)
     fd.append('category', category)
@@ -97,6 +116,12 @@ export default function PhotoGallery({ projectId, initialPhotos, canDelete }: Ph
 
   return (
     <div className="space-y-4">
+      {queuedMessage && (
+        <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          <WifiOff size={14} className="shrink-0" />
+          {queuedMessage}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-1 flex-wrap">
           {TABS.map((tab) => {
@@ -121,8 +146,8 @@ export default function PhotoGallery({ projectId, initialPhotos, canDelete }: Ph
             onClick={() => setUploadOpen(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Upload size={14} />
-            Upload Photo
+            {online ? <Upload size={14} /> : <WifiOff size={14} />}
+            {online ? 'Upload Photo' : 'Queue Photo'}
           </button>
         )}
       </div>

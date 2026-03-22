@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { ok, notFound, serverError, err } from '@/lib/api'
 import { requireSession, requireRole, ApiError } from '@/lib/middleware'
 import { Role } from '@prisma/client'
+import { writeAudit } from '@/lib/audit'
+import { ProjectPatchSchema, parseBody } from '@/lib/validation'
 
 const MANAGEMENT_ROLES: Role[] = [Role.OWNER, Role.PROJECT_MANAGER, Role.PLATFORM_ADMIN]
 
@@ -54,13 +56,15 @@ export async function PATCH(req: NextRequest) {
     const project = await prisma.project.findUnique({ where: { id } })
     if (!project) return notFound('Project')
 
-    const body = await req.json()
+    const rawBody = await req.json()
+    const parsed = parseBody(ProjectPatchSchema, rawBody)
+    if (!parsed.success) return err(parsed.error)
     const {
       name, projectType, status, street, city, state, zip,
       startDate, estimatedEndDate, estimatedHours,
       crewId, projectManagerId, globalMarginOverride,
       notes, internalNotes,
-    } = body
+    } = parsed.data
 
     if (name !== undefined && !name?.trim()) return err('Project name is required')
 
@@ -88,6 +92,23 @@ export async function PATCH(req: NextRequest) {
     if (internalNotes !== undefined) data.internalNotes = internalNotes || null
 
     const updated = await prisma.project.update({ where: { id }, data })
+
+    if (status !== undefined && status !== project.status) {
+      await writeAudit({
+        entityType: 'Project', entityId: id, action: 'STATUS_CHANGED',
+        changedByUserId: session.userId,
+        before: { status: project.status }, after: { status: updated.status },
+      })
+    }
+    if (globalMarginOverride !== undefined) {
+      await writeAudit({
+        entityType: 'Project', entityId: id, action: 'MARGIN_OVERRIDE',
+        changedByUserId: session.userId,
+        before: { globalMarginOverride: project.globalMarginOverride?.toString() ?? null },
+        after: { globalMarginOverride: updated.globalMarginOverride?.toString() ?? null },
+      })
+    }
+
     return ok({ project: updated })
   } catch (e) {
     if (e instanceof ApiError) {

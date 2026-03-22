@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 export const PHOTOS_BUCKET = 'project-photos'
+export const RECEIPTS_BUCKET = 'receipts'
 
 let _client: SupabaseClient | null = null
 

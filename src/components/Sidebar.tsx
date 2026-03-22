@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderOpen, FileText, Receipt, Clock,
-  Camera, Users, Package, Settings, LogOut, Leaf, type LucideIcon,
+  Camera, Users, UserCog, Package, Settings, LogOut, Leaf, BarChart2, KeyRound, type LucideIcon,
 } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import type { NavItem } from '@/lib/nav'
@@ -17,7 +17,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Clock,
   Camera,
   Users,
+  UserCog,
   Package,
+  BarChart2,
   Settings,
 }
 
@@ -78,6 +80,13 @@ export default function Sidebar({ navItems, userInitials, userName, userEmail }:
           </div>
           <ThemeToggle />
         </div>
+        <Link
+          href="/account"
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <KeyRound size={16} />
+          {"Account & Password"}
+        </Link>
         <form action="/api/auth/logout" method="POST">
           <button
             type="submit"

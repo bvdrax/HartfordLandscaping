@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hartford Landscaping — Project Management PWA
+
+A mobile-first, offline-capable progressive web app for managing a landscaping business. Handles projects, crew scheduling, time tracking, quoting, invoicing, expense receipts, and customer communication in one place.
+
+## Features
+
+- **Projects** — Create and track jobs by status, assign crews and project managers, attach photos
+- **Quoting & Invoicing** — Build quotes with line items and SKU lookups, convert to invoices, collect payments via Stripe
+- **Time Tracking** — Field workers clock in/out on their phones; supports offline queuing and syncs when reconnected
+- **Receipts** — Photograph and catalog job expenses; smart tax/delivery amortization across line items
+- **Crew & Workers** — Manage employees and subcontractors with role-based access and scheduling
+- **Suppliers** — Maintain a supplier catalog with bulk pricing tiers per SKU
+- **Reports** — Hours, invoices, and profitability analytics
+- **Customer Portal** — Share a read-only project view with customers via a secure JWT link
+- **Offline-First PWA** — Install to home screen; time logs and uploads queue locally and sync automatically
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router), React 18, TypeScript |
+| Database | PostgreSQL + Prisma ORM |
+| File Storage | Supabase (photos & receipts) |
+| Authentication | Magic-link email + JWT (HTTP-only cookies) |
+| Payments | Stripe |
+| Notifications | Twilio (SMS), Resend (email) |
+| UI | Tailwind CSS + Radix UI |
+| PWA | next-pwa + Workbox |
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- PostgreSQL database
+- Supabase project with `project-photos` and `receipts` storage buckets
+- Stripe, Twilio, and Resend accounts
+
+### Environment Variables
+
+Create a `.env` file:
+
+```env
+DATABASE_URL=
+
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+JWT_SECRET=
+
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+
+RESEND_API_KEY=
+EMAIL_FROM=
+
+NEXT_PUBLIC_APP_URL=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npx prisma migrate dev
+npx prisma db seed    # optional: seed demo data
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000). Log in via magic link — check your email (or the terminal in dev if email is not configured).
 
-## Learn More
+## User Roles
 
-To learn more about Next.js, take a look at the following resources:
+| Role | Access |
+|------|--------|
+| `PLATFORM_ADMIN` | Full system access |
+| `OWNER` | Full business access |
+| `ACCOUNTANT` | Quotes, invoices, receipts, reports |
+| `PROJECT_MANAGER` | Projects, crew, scheduling, time logs |
+| `FIELD_WORKER` | Own crew's projects, clock in/out |
+| `SUBCONTRACTOR` | Assigned projects only |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev        # Development server
+npm run build      # Production build
+npm run start      # Start production server
+npm run lint       # ESLint
+npx prisma studio  # Database browser
+```
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Build and deploy as a standard Next.js application. The PWA service worker is only registered in production. Ensure the Stripe webhook endpoint (`/api/webhooks/stripe`) is reachable from the internet and the `STRIPE_WEBHOOK_SECRET` is set.

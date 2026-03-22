@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { ok, notFound, serverError, err } from '@/lib/api'
 import { requireSession, requireRole, ApiError } from '@/lib/middleware'
 import { Role } from '@prisma/client'
+import { writeAudit } from '@/lib/audit'
+import { QuotePatchSchema, parseBody } from '@/lib/validation'
 
 const MGMT: Role[] = [Role.OWNER, Role.PROJECT_MANAGER, Role.PLATFORM_ADMIN]
 
@@ -36,7 +38,10 @@ export async function PATCH(req: NextRequest) {
     if (!existing) return notFound('Quote')
     if (existing.status !== 'DRAFT') return err('Only DRAFT quotes can be edited')
 
-    const { notes, termsAndConditions, status } = await req.json()
+    const rawBody = await req.json()
+    const parsed = parseBody(QuotePatchSchema, rawBody)
+    if (!parsed.success) return err(parsed.error)
+    const { notes, termsAndConditions, status } = parsed.data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = {}
     if (notes !== undefined) data.notes = notes || null
@@ -44,6 +49,15 @@ export async function PATCH(req: NextRequest) {
     if (status !== undefined) data.status = status
 
     const quote = await prisma.quote.update({ where: { id }, data })
+
+    if (status !== undefined && status !== existing.status) {
+      await writeAudit({
+        entityType: 'Quote', entityId: id, action: 'STATUS_CHANGED',
+        changedByUserId: session.userId,
+        before: { status: existing.status }, after: { status: quote.status },
+      })
+    }
+
     return ok({ quote })
   } catch (e) {
     if (e instanceof ApiError) return NextResponse.json({ data: null, error: e.message, meta: null }, { status: e.status })

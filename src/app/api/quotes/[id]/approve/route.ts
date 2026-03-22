@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { ok, notFound, serverError, err } from '@/lib/api'
 import { verifyPortalToken } from '@/lib/auth'
 import { ApiError } from '@/lib/middleware'
+import { writeAudit } from '@/lib/audit'
 
 function getQuoteId(req: NextRequest) {
   const parts = req.nextUrl.pathname.split('/')
@@ -48,6 +49,11 @@ export async function POST(req: NextRequest) {
         approvedAt: new Date(),
         approvedByCustomerId: customerId,
       },
+    })
+
+    await writeAudit({
+      entityType: 'Quote', entityId: quoteId, action: 'APPROVED',
+      before: { status: 'SENT' }, after: { status: 'APPROVED', approvedByCustomerId: customerId },
     })
 
     return ok({ quote: { id: updated.id, status: updated.status, approvedAt: updated.approvedAt } })
