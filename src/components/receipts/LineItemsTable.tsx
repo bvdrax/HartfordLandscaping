@@ -7,8 +7,15 @@ export interface LineItem {
   description: string
   quantity: string
   unitCost: string
+  projectId?: string | null
+  expenseType?: string | null
   amortizedTax?: number
   amortizedDelivery?: number
+}
+
+interface Project {
+  id: string
+  name: string
 }
 
 interface Props {
@@ -16,18 +23,19 @@ interface Props {
   onChange: (items: LineItem[]) => void
   taxAmount: string
   deliveryFee: string
+  projects?: Project[]
 }
 
 function newItem(): LineItem {
-  return { id: crypto.randomUUID(), description: '', quantity: '1', unitCost: '0' }
+  return { id: crypto.randomUUID(), description: '', quantity: '1', unitCost: '0', projectId: null, expenseType: null }
 }
 
 function fmt(n: number) {
   return '$' + n.toFixed(2)
 }
 
-export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee }: Props) {
-  function update(id: string, field: keyof LineItem, value: string) {
+export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee, projects }: Props) {
+  function update(id: string, field: keyof LineItem, value: string | null) {
     onChange(items.map((li) => li.id === id ? { ...li, [field]: value } : li))
   }
 
@@ -39,7 +47,6 @@ export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee
     onChange([...items, newItem()])
   }
 
-  // Compute amortized tax/delivery for display
   const extended = items.map((li) => (parseFloat(li.quantity) || 0) * (parseFloat(li.unitCost) || 0))
   const totalExtended = extended.reduce((s, v) => s + v, 0)
   const tax = parseFloat(taxAmount) || 0
@@ -83,10 +90,7 @@ export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee
               <div className="flex-1">
                 <label className="text-xs text-muted-foreground">Qty</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={li.quantity}
+                  type="number" min="0" step="any" value={li.quantity}
                   onChange={(e) => update(li.id, 'quantity', e.target.value)}
                   className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -94,10 +98,7 @@ export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee
               <div className="flex-1">
                 <label className="text-xs text-muted-foreground">Unit Cost</label>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={li.unitCost}
+                  type="number" min="0" step="0.01" value={li.unitCost}
                   onChange={(e) => update(li.id, 'unitCost', e.target.value)}
                   className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
@@ -110,6 +111,33 @@ export default function LineItemsTable({ items, onChange, taxAmount, deliveryFee
                 <p className="font-semibold text-foreground">Total: {fmt(total)}</p>
               </div>
             </div>
+            {(projects && projects.length > 0) && (
+              <div className="flex items-center gap-2 pl-6">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Project override</label>
+                  <select
+                    value={li.projectId ?? ''}
+                    onChange={(e) => update(li.id, 'projectId', e.target.value || null)}
+                    className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">Inherit from receipt</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Expense type</label>
+                  <select
+                    value={li.expenseType ?? ''}
+                    onChange={(e) => update(li.id, 'expenseType', e.target.value || null)}
+                    className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">Inherit from receipt</option>
+                    <option value="BUSINESS">Business</option>
+                    <option value="PERSONAL">Personal</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         )
       })}

@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
     const taxAmount = formData.get('taxAmount') as string | null
     const deliveryFee = formData.get('deliveryFee') as string | null
     const notes = formData.get('notes') as string | null
+    const expenseType = (formData.get('expenseType') as string | null) ?? 'BUSINESS'
+    const purchasedByUserId = formData.get('purchasedByUserId') as string | null
     const lineItemsJson = formData.get('lineItems') as string | null
 
     if (!projectId) return err('projectId is required')
@@ -89,6 +91,8 @@ export async function POST(req: NextRequest) {
       description: string
       quantity: string | number
       unitCost: string | number
+      projectId?: string | null
+      expenseType?: string | null
     }
     let lineItems: RawLineItem[] = []
     if (lineItemsJson) {
@@ -104,7 +108,14 @@ export async function POST(req: NextRequest) {
     const processedItems = lineItems.map((li) => {
       const qty = parseFloat(String(li.quantity)) || 1
       const cost = parseFloat(String(li.unitCost)) || 0
-      return { description: li.description, quantity: qty, unitCost: cost, extendedCost: qty * cost }
+      return {
+        description: li.description,
+        quantity: qty,
+        unitCost: cost,
+        extendedCost: qty * cost,
+        projectId: li.projectId ?? null,
+        expenseType: (li.expenseType as 'BUSINESS' | 'PERSONAL' | null) ?? null,
+      }
     })
 
     const totalExtended = processedItems.reduce((s, li) => s + li.extendedCost, 0)
@@ -121,16 +132,19 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    const receipt = await prisma.receipt.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const receipt = await (prisma.receipt.create as any)({
       data: {
         projectId,
         uploadedByUserId: session.userId,
+        purchasedByUserId: purchasedByUserId || null,
         vendor: vendor || null,
         receiptDate: receiptDate ? new Date(receiptDate) : null,
         totalAmount: total ?? null,
         taxAmount: tax ?? null,
         deliveryFee: delivery ?? null,
         storageUrl,
+        expenseType: (expenseType === 'PERSONAL' ? 'PERSONAL' : 'BUSINESS'),
         notes: notes || null,
         lineItems: {
           create: withAmortization.map((li) => ({
@@ -141,6 +155,8 @@ export async function POST(req: NextRequest) {
             amortizedTax: li.amortizedTax,
             amortizedDelivery: li.amortizedDelivery,
             totalCost: li.totalCost,
+            projectId: li.projectId,
+            expenseType: li.expenseType,
           })),
         },
       },

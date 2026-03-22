@@ -37,12 +37,16 @@ export const ReceiptPatchSchema = z.object({
   deliveryFee: z.union([z.string(), z.number()]).nullable().optional(),
   notes: z.string().nullable().optional(),
   status: z.enum(['PENDING', 'REVIEWED', 'APPROVED', 'REJECTED']).optional(),
+  expenseType: z.enum(['BUSINESS', 'PERSONAL']).optional(),
+  purchasedByUserId: z.string().nullable().optional(),
   lineItems: z.array(z.object({
     description: z.string(),
     quantity: z.union([z.string(), z.number()]),
     unitCost: z.union([z.string(), z.number()]),
     amortizedTax: z.union([z.string(), z.number()]).optional(),
     amortizedDelivery: z.union([z.string(), z.number()]).optional(),
+    projectId: z.string().nullable().optional(),
+    expenseType: z.enum(['BUSINESS', 'PERSONAL']).nullable().optional(),
   })).optional(),
 })
 

@@ -43,6 +43,21 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     },
   })
 
+  // Receipt line items attributed to this project (directly or via receipt)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const receiptLineItems = params.id ? await (prisma.receiptLineItem.findMany as any)({
+    where: {
+      OR: [
+        { projectId: params.id },
+        { projectId: null, receipt: { projectId: params.id } },
+      ],
+    },
+    include: {
+      receipt: { select: { id: true, vendor: true, receiptDate: true, expenseType: true } },
+    },
+    orderBy: { receipt: { receiptDate: 'desc' } },
+  }) : []
+
   const activeCrews = project ? await prisma.crew.findMany({
     where: { isActive: true },
     select: { id: true, name: true, members: { select: { user: { select: { firstName: true, phone: true } } } } },
@@ -273,16 +288,60 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
         )}
       </section>
 
-      {canEdit && (
-        <div className="flex items-center justify-between">
-          <Link href={'/receipts/new?projectId=' + project.id} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-            <Camera size={13} />Add Receipt
-          </Link>
-          <Link href={'/receipts?projectId=' + project.id} className="text-xs text-muted-foreground hover:text-foreground">
-            View receipts
-          </Link>
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground">Receipt Costs</h2>
+          {canEdit && (
+            <Link href={'/receipts/new?projectId=' + project.id} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <Camera size={13} />Add Receipt
+            </Link>
+          )}
         </div>
-      )}
+        {receiptLineItems.length === 0 ? (
+          <div className="bg-card border border-border rounded-lg p-4 text-center">
+            <p className="text-sm text-muted-foreground">No receipt costs yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {receiptLineItems.map((li: {
+              id: string
+              description: string
+              totalCost: number
+              expenseType: string | null
+              receipt: { id: string; vendor: string | null; receiptDate: Date | null; expenseType: string }
+            }) => {
+              const effectiveExpense = li.expenseType ?? li.receipt.expenseType ?? 'BUSINESS'
+              const isPersonal = effectiveExpense === 'PERSONAL'
+              return (
+                <Link key={li.id} href={'/receipts/' + li.receipt.id}
+                  className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 hover:border-primary/50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{li.description}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {li.receipt.vendor ?? 'Receipt'}
+                        {li.receipt.receiptDate && ' \u00b7 ' + new Date(li.receipt.receiptDate).toLocaleDateString()}
+                      </span>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        isPersonal ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {isPersonal ? 'Personal' : 'Business'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground shrink-0 ml-3">
+                    ${Number(li.totalCost).toFixed(2)}
+                  </span>
+                </Link>
+              )
+            })}
+            <div className="flex justify-between text-sm font-semibold text-foreground px-4 py-2 bg-muted/30 rounded-lg">
+              <span>Total receipt costs</span>
+              <span>${receiptLineItems.reduce((s: number, li: { totalCost: number }) => s + Number(li.totalCost), 0).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section>
         <h2 className="text-base font-semibold text-foreground mb-3">Photos</h2>
