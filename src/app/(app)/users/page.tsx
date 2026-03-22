@@ -27,9 +27,10 @@ export default async function UsersPage() {
     },
   })
 
-  const sanitized = users.map(({ passwordHash, ...u }) => ({
+  const sanitized = users.map(({ passwordHash, createdAt, ...u }) => ({
     ...u,
     hasPassword: passwordHash !== null,
+    createdAt: createdAt.toISOString(),
   }))
 
   return <UsersClient users={sanitized} currentUserId={session.userId} />
