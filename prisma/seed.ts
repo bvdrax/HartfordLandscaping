@@ -7,10 +7,8 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-// All staff use this password in dev
-const pw = await bcrypt.hash('devpassword', 10)
-
 async function main() {
+  const pw = await bcrypt.hash('devpassword', 10)
   console.log('🌱 Seeding database...')
 
   // ── Global Settings ───────────────────────────────────────────────────────
