@@ -10,8 +10,15 @@ interface Project {
   name: string
 }
 
+interface User {
+  id: string
+  firstName: string
+  lastName: string
+}
+
 interface Props {
   projects: Project[]
+  users: User[]
   defaultProjectId?: string
 }
 
@@ -58,12 +65,14 @@ function HeaderFields({ fields, setFields }: {
   )
 }
 
-export default function ReceiptForm({ projects, defaultProjectId }: Props) {
+export default function ReceiptForm({ projects, users, defaultProjectId }: Props) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
   const [projectId, setProjectId] = useState(defaultProjectId ?? '')
+  const [expenseType, setExpenseType] = useState('BUSINESS')
+  const [purchasedByUserId, setPurchasedByUserId] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [fields, setFields] = useState({
@@ -107,6 +116,8 @@ export default function ReceiptForm({ projects, defaultProjectId }: Props) {
         description: li.description,
         quantity: String(li.quantity ?? 1),
         unitCost: String(li.unitCost ?? 0),
+        projectId: null,
+        expenseType: null,
       })))
     }
   }
@@ -126,10 +137,14 @@ export default function ReceiptForm({ projects, defaultProjectId }: Props) {
     fd.append('taxAmount', fields.taxAmount)
     fd.append('deliveryFee', fields.deliveryFee)
     fd.append('notes', fields.notes)
+    fd.append('expenseType', expenseType)
+    if (purchasedByUserId) fd.append('purchasedByUserId', purchasedByUserId)
     fd.append('lineItems', JSON.stringify(lineItems.map((li) => ({
       description: li.description,
       quantity: parseFloat(li.quantity) || 1,
       unitCost: parseFloat(li.unitCost) || 0,
+      projectId: li.projectId ?? null,
+      expenseType: li.expenseType ?? null,
     }))))
 
     const res = await fetch('/api/receipts', { method: 'POST', body: fd })
@@ -145,13 +160,31 @@ export default function ReceiptForm({ projects, defaultProjectId }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <div>
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</label>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
-          <option value="">Select project...</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</label>
+          <select value={projectId} onChange={(e) => setProjectId(e.target.value)} required
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+            <option value="">Select project...</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Expense Type</label>
+          <select value={expenseType} onChange={(e) => setExpenseType(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+            <option value="BUSINESS">Business</option>
+            <option value="PERSONAL">Personal</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Purchased By</label>
+          <select value={purchasedByUserId} onChange={(e) => setPurchasedByUserId(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary">
+            <option value="">Not specified</option>
+            {users.map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -188,7 +221,13 @@ export default function ReceiptForm({ projects, defaultProjectId }: Props) {
 
       <HeaderFields fields={fields} setFields={setFields} />
 
-      <LineItemsTable items={lineItems} onChange={setLineItems} taxAmount={fields.taxAmount} deliveryFee={fields.deliveryFee} />
+      <LineItemsTable
+        items={lineItems}
+        onChange={setLineItems}
+        taxAmount={fields.taxAmount}
+        deliveryFee={fields.deliveryFee}
+        projects={projects}
+      />
 
       <button type="submit" disabled={saving}
         className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-medium py-3 rounded-md text-sm transition-colors">

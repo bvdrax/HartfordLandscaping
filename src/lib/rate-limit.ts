@@ -46,7 +46,7 @@ export function checkRateLimit(key: string, options: RateLimitOptions): RateLimi
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()
-    for (const [key, entry] of store.entries()) {
+    for (const [key, entry] of Array.from(store.entries())) {
       if (now >= entry.resetAt) store.delete(key)
     }
   }, 60_000)

@@ -11,6 +11,11 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['lucide-react'],
+  webpack: (config) => {
+    config.optimization.concatenateModules = false
+    return config
+  },
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'prisma', '@supabase/supabase-js', 'resend', 'jsonwebtoken', 'stripe', '@anthropic-ai/sdk', 'twilio'],
   },

@@ -16,13 +16,15 @@ export async function GET(req: NextRequest) {
     const session = requireSession(req)
     const id = getId(req)
 
-    const receipt = await prisma.receipt.findUnique({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const receipt = await (prisma.receipt.findUnique as any)({
       where: { id },
       include: {
         project: { select: { id: true, name: true } },
         uploadedBy: { select: { id: true, firstName: true, lastName: true } },
         reviewedBy: { select: { id: true, firstName: true, lastName: true } },
-        lineItems: true,
+        purchasedBy: { select: { id: true, firstName: true, lastName: true } },
+        lineItems: { include: { project: { select: { id: true, name: true } } } },
       },
     })
     if (!receipt) return notFound('Receipt')
@@ -50,23 +52,26 @@ export async function PATCH(req: NextRequest) {
     const rawBody = await req.json()
     const parsed = parseBody(ReceiptPatchSchema, rawBody)
     if (!parsed.success) return err(parsed.error)
-    const { vendor, receiptDate, totalAmount, taxAmount, deliveryFee, notes, status, lineItems } = parsed.data
+    const { vendor, receiptDate, totalAmount, taxAmount, deliveryFee, notes, status, expenseType, purchasedByUserId, lineItems } = parsed.data
 
     // Only Owner/Accountant/Admin can approve/reject
     const canApprove = ['OWNER', 'ACCOUNTANT', 'PLATFORM_ADMIN'].includes(session.role as string)
     if (status && !canApprove) return err('Forbidden', 403)
 
     // Update header
-    const updated = await prisma.receipt.update({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updated = await (prisma.receipt.update as any)({
       where: { id },
       data: {
         vendor: vendor !== undefined ? vendor : receipt.vendor,
         receiptDate: receiptDate !== undefined ? (receiptDate ? new Date(receiptDate) : null) : receipt.receiptDate,
-        totalAmount: totalAmount !== undefined ? (totalAmount !== null ? parseFloat(totalAmount) : null) : receipt.totalAmount,
-        taxAmount: taxAmount !== undefined ? (taxAmount !== null ? parseFloat(taxAmount) : null) : receipt.taxAmount,
-        deliveryFee: deliveryFee !== undefined ? (deliveryFee !== null ? parseFloat(deliveryFee) : null) : receipt.deliveryFee,
+        totalAmount: totalAmount !== undefined ? (totalAmount !== null ? parseFloat(String(totalAmount)) : null) : receipt.totalAmount,
+        taxAmount: taxAmount !== undefined ? (taxAmount !== null ? parseFloat(String(taxAmount)) : null) : receipt.taxAmount,
+        deliveryFee: deliveryFee !== undefined ? (deliveryFee !== null ? parseFloat(String(deliveryFee)) : null) : receipt.deliveryFee,
         notes: notes !== undefined ? notes : receipt.notes,
         status: status ?? receipt.status,
+        ...(expenseType !== undefined && { expenseType }),
+        ...(purchasedByUserId !== undefined && { purchasedByUserId: purchasedByUserId || null }),
         reviewedByUserId: status ? session.userId : receipt.reviewedByUserId,
         reviewedAt: status ? new Date() : receipt.reviewedAt,
       },
@@ -82,6 +87,8 @@ export async function PATCH(req: NextRequest) {
         unitCost: string | number
         amortizedTax?: string | number
         amortizedDelivery?: string | number
+        projectId?: string | null
+        expenseType?: string | null
       }
 
       const processedItems = (lineItems as RawLineItem[]).map((li) => {
@@ -99,6 +106,8 @@ export async function PATCH(req: NextRequest) {
           amortizedTax,
           amortizedDelivery,
           totalCost: extendedCost + amortizedTax + amortizedDelivery,
+          projectId: li.projectId ?? null,
+          expenseType: (li.expenseType as 'BUSINESS' | 'PERSONAL' | null) ?? null,
         }
       })
 

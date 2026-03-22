@@ -3,14 +3,12 @@ import {
   PayType, QuoteStatus, InvoiceStatus, InvoiceType, PaymentMethod,
   ReceiptStatus, ChangeOrderStatus, TaskStatus,
 } from '@prisma/client'
-import { createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-// All staff use this password in dev
-const pw = createHash('sha256').update('devpassword').digest('hex')
-
 async function main() {
+  const pw = await bcrypt.hash('devpassword', 10)
   console.log('🌱 Seeding database...')
 
   // ── Global Settings ───────────────────────────────────────────────────────

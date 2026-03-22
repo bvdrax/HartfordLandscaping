@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest) {
 
     const inAt = clockInAt ? new Date(clockInAt) : log.clockInAt
     const outAt = clockOutAt ? new Date(clockOutAt) : log.clockOutAt
-    const breakMins = breakMinutes !== undefined ? parseInt(breakMinutes) : log.breakMinutes
+    const breakMins = breakMinutes !== undefined ? parseInt(String(breakMinutes)) : log.breakMinutes
 
     let totalMinutes = log.totalMinutes
     if (outAt) {

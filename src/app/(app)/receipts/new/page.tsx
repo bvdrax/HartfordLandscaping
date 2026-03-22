@@ -13,12 +13,10 @@ export default async function NewReceiptPage({ searchParams }: { searchParams: {
   const canAdd = ['OWNER', 'PLATFORM_ADMIN', 'ACCOUNTANT', 'PROJECT_MANAGER', 'FIELD_WORKER'].includes(role)
   if (!canAdd) redirect('/receipts')
 
-  const projects = await prisma.project.findMany({
-    select: { id: true, name: true },
-    orderBy: { name: 'asc' },
-  })
-
-  const serialized = projects.map((p) => ({ id: p.id, name: p.name }))
+  const [projects, users] = await Promise.all([
+    prisma.project.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.user.findMany({ where: { isActive: true }, select: { id: true, firstName: true, lastName: true }, orderBy: { firstName: 'asc' } }),
+  ])
 
   return (
     <div className="p-6 space-y-6 max-w-lg">
@@ -30,7 +28,7 @@ export default async function NewReceiptPage({ searchParams }: { searchParams: {
         <p className="text-sm text-muted-foreground mt-1">Upload a receipt photo and optionally use OCR to extract data.</p>
       </div>
 
-      <ReceiptForm projects={serialized} defaultProjectId={searchParams.projectId} />
+      <ReceiptForm projects={projects} users={users} defaultProjectId={searchParams.projectId} />
     </div>
   )
 }

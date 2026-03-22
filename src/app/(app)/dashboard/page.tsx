@@ -62,14 +62,20 @@ export default async function DashboardPage() {
     }),
   ])
 
-  const weekHours = weekTimeLogs.reduce((s, l) => s + (l.totalMinutes ?? 0), 0) / 60
+  const weekHours = weekTimeLogs.reduce((s: number, l: { totalMinutes: number | null }) => s + (l.totalMinutes ?? 0), 0) / 60
   const unpaidCount = unpaidInvoices.length
-  const unpaidAmount = unpaidInvoices.reduce((s, inv) => s + Number(inv.total) - Number(inv.amountPaid), 0)
+  const unpaidAmount = unpaidInvoices.reduce((s: number, inv: { total: unknown; amountPaid: unknown }) => s + Number(inv.total) - Number(inv.amountPaid), 0)
 
-  const serializedProjects = (allProjects as Awaited<typeof allProjects>).map((p) => {
+  type ProjectRow = {
+    id: string; name: string; status: string; projectType: string | null; startDate: Date | null
+    customers: { firstName: string; lastName: string }[]
+    quotes: { total: unknown }[]
+    invoices: { total: unknown; amountPaid: unknown }[]
+  }
+  const serializedProjects = (allProjects as ProjectRow[]).map((p) => {
     const primaryCustomer = p.customers[0]
     const approvedQuote = p.quotes[0]
-    const balance = p.invoices.reduce((s, inv) => s + (Number(inv.total) - Number(inv.amountPaid)), 0)
+    const balance = p.invoices.reduce((s: number, inv) => s + (Number(inv.total) - Number(inv.amountPaid)), 0)
     return {
       id: p.id,
       name: p.name,
@@ -82,7 +88,8 @@ export default async function DashboardPage() {
     }
   })
 
-  const serializedAssignments = crewAssignments.map((a) => ({
+  type AssignmentRow = { crew: { name: string }; project: { id: string; name: string }; startDate: Date; endDate: Date | null }
+  const serializedAssignments = (crewAssignments as AssignmentRow[]).map((a) => ({
     crewName: a.crew.name,
     projectId: a.project.id,
     projectName: a.project.name,

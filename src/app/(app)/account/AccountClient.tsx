@@ -11,14 +11,14 @@ interface Props {
 export default function AccountClient({ name, email, hasPassword: initialHasPassword }: Props) {
   const [hasPassword, setHasPassword] = useState(initialHasPassword)
   const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   async function handleSetPassword(e: React.FormEvent) {
     e.preventDefault()
     setMessage(null)
-    if (password !== confirm) { setMessage({ text: 'Passwords do not match', ok: false }); return }
+    if (password !== confirmPassword) { setMessage({ text: 'Passwords do not match', ok: false }); return }
     setLoading(true)
     try {
       const res = await fetch('/api/auth/set-password', {
@@ -31,7 +31,7 @@ export default function AccountClient({ name, email, hasPassword: initialHasPass
         setMessage({ text: 'Password set successfully', ok: true })
         setHasPassword(true)
         setPassword('')
-        setConfirm('')
+        setConfirmPassword('')
       } else {
         setMessage({ text: json.error ?? 'Failed to set password', ok: false })
       }
@@ -112,8 +112,8 @@ export default function AccountClient({ name, email, hasPassword: initialHasPass
               type="password"
               required
               minLength={8}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]"
             />
           </div>
