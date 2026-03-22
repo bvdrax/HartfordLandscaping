@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest) {
     if (estimatedHours !== undefined) data.estimatedHours = estimatedHours ? parseFloat(String(estimatedHours)) : null
     if (crewId !== undefined) data.crewId = crewId || null
     if (projectManagerId !== undefined) data.projectManagerId = projectManagerId || null
-    if (globalMarginOverride !== undefined) data.globalMarginOverride = globalMarginOverride !== null ? parseFloat(globalMarginOverride) : null
+    if (globalMarginOverride !== undefined) data.globalMarginOverride = globalMarginOverride !== null ? parseFloat(String(globalMarginOverride)) : null
     if (notes !== undefined) data.notes = notes || null
     if (internalNotes !== undefined) data.internalNotes = internalNotes || null
 
