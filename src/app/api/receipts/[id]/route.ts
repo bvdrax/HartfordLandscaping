@@ -62,9 +62,9 @@ export async function PATCH(req: NextRequest) {
       data: {
         vendor: vendor !== undefined ? vendor : receipt.vendor,
         receiptDate: receiptDate !== undefined ? (receiptDate ? new Date(receiptDate) : null) : receipt.receiptDate,
-        totalAmount: totalAmount !== undefined ? (totalAmount !== null ? parseFloat(totalAmount) : null) : receipt.totalAmount,
-        taxAmount: taxAmount !== undefined ? (taxAmount !== null ? parseFloat(taxAmount) : null) : receipt.taxAmount,
-        deliveryFee: deliveryFee !== undefined ? (deliveryFee !== null ? parseFloat(deliveryFee) : null) : receipt.deliveryFee,
+        totalAmount: totalAmount !== undefined ? (totalAmount !== null ? parseFloat(String(totalAmount)) : null) : receipt.totalAmount,
+        taxAmount: taxAmount !== undefined ? (taxAmount !== null ? parseFloat(String(taxAmount)) : null) : receipt.taxAmount,
+        deliveryFee: deliveryFee !== undefined ? (deliveryFee !== null ? parseFloat(String(deliveryFee)) : null) : receipt.deliveryFee,
         notes: notes !== undefined ? notes : receipt.notes,
         status: status ?? receipt.status,
         reviewedByUserId: status ? session.userId : receipt.reviewedByUserId,
